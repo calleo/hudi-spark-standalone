@@ -1,7 +1,6 @@
 from pyspark.sql import SparkSession
 from contextlib import contextmanager
 from pyspark.context import SparkContext
-import sys
 
 
 table_name = "foo_table"
@@ -20,6 +19,9 @@ def spark():
     session = (
         SparkSession.builder.appName("Trying Hudi!")
         .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
+        # This is important, otherwise Hudi will not write to the
+        # same catalog that the Spark session uses
+        .enableHiveSupport()
         .getOrCreate()
     )
     context = session.sparkContext
@@ -72,9 +74,6 @@ def write_table():
         df.write.format("hudi").options(**config).mode("append").save()
         print(f"Persisted dataframe as Hudi table in {path}")
 
-
-def read_table():
-    with spark() as context:
         # List databases to verify that it has been created
         databases = context.session.catalog.listDatabases()
         print(f"Found DBs: {databases}")
@@ -87,8 +86,6 @@ def read_table():
             print(f"Got data: {row.asDict(recursive=True)}")
 
 
-if "--write" in sys.argv:
-    write_table()
-
-if "--read" in sys.argv:
-    read_table()
+# Spark session needs to be stopped between reading and writing when using
+# sparks built-in Metastore, since it can only handle one connection at a time
+write_table()
