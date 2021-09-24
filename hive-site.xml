@@ -12,4 +12,14 @@
     <value>true</value>
   </property>
 
+  <!--property>
+    <name>javax.jdo.option.ConnectionURL</name>
+    <value>jdbc:derby://localhost:1527/metastore_db;create=true</value>
+  </property>
+
+  <property>
+    <name>javax.jdo.option.ConnectionDriverName</name>
+    <value>org.apache.derby.jdbc.ClientDriver</value>
+  </property-->
+
 </configuration>

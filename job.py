@@ -1,6 +1,8 @@
 from pyspark.sql import SparkSession
 from contextlib import contextmanager
 from pyspark.context import SparkContext
+import sys
+import time
 
 
 table_name = "foo_table"
@@ -61,31 +63,48 @@ def get_hudi_config(table_name, database_name, path):
     }
 
 
-def write_table():
-    with spark() as context:
-        df = create_df(context.session, context.context)
-        config = get_hudi_config(
-            table_name=table_name, database_name=database_name, path=path
-        )
-        # Check if local mode
-        print(f"Running mode: {context.context.master}")
+def write_table(context: Context):
+    df = create_df(context.session, context.context)
+    config = get_hudi_config(
+        table_name=table_name, database_name=database_name, path=path
+    )
+    # Check if local mode
+    print(f"Running mode: {context.context.master}")
 
-        # Persist the data and triggers sync to Hive metastore
-        df.write.format("hudi").options(**config).mode("append").save()
-        print(f"Persisted dataframe as Hudi table in {path}")
+    # Persist the data and triggers sync to Hive metastore
+    df.write.format("hudi").options(**config).mode("append").save()
+    print(f"Persisted dataframe as Hudi table in {path}")
 
-        # List databases to verify that it has been created
-        databases = context.session.catalog.listDatabases()
-        print(f"Found DBs: {databases}")
 
-        # Get the data
-        print("Reading data using Hive metastore")
-        context.session.sql(f"USE {database_name}")
-        saved_data = context.session.sql(f"SELECT * FROM {table_name}")
-        for row in saved_data.collect():
-            print(f"Got data: {row.asDict(recursive=True)}")
+def read_table(context: Context):
+    # List databases to verify that it has been created
+    databases = context.session.catalog.listDatabases()
+    print(f"Found DBs: {databases}")
+
+    # Get the data
+    print("Reading data using Hive metastore")
+    context.session.sql(f"USE {database_name}")
+    saved_data = context.session.sql(f"SELECT * FROM {table_name}")
+    for row in saved_data.collect():
+        print(f"Got data: {row.asDict(recursive=True)}")
 
 
 # Spark session needs to be stopped between reading and writing when using
 # sparks built-in Metastore, since it can only handle one connection at a time
-write_table()
+
+def run():
+    if "--write" in sys.argv:
+        with spark() as context:
+            write_table(context)
+
+    if "--read" in sys.argv:
+        with spark() as context:
+            read_table(context)
+
+    if "--write-read" in sys.argv:
+        with spark() as context:
+            write_table(context)
+            read_table(context)
+
+
+run()
